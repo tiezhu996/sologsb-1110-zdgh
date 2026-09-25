@@ -47,7 +47,7 @@ function buildSeedLayers(): LacquerLayer[] {
   ];
 
   const seqMap = new Map<string, number>();
-  return plan.map(([guqinNo, mixRatio, temp, humidity, grit, thickness, days, operator], index) => {
+  const layers: LacquerLayer[] = plan.map(([guqinNo, mixRatio, temp, humidity, grit, thickness, days, operator], index) => {
     const seq = (seqMap.get(guqinNo) ?? 0) + 1;
     seqMap.set(guqinNo, seq);
     return {
@@ -62,8 +62,24 @@ function buildSeedLayers(): LacquerLayer[] {
       totalThickness: 0,
       appliedAt: daysAgo(days),
       operator,
+      reworks: [],
     };
   });
+
+  // 示例：Q-2504 第 1 遍曾因打磨不到位返工一次（该琴尚未上弦），遍次号不变、按新厚度计
+  const reworked = layers.find((l) => l.guqinNo === 'Q-2504' && l.seq === 1);
+  if (reworked) {
+    reworked.reworks = [
+      {
+        id: 'rework-seed-001',
+        reworkedAt: daysAgo(30),
+        reworker: '周砚秋',
+        reason: '该遍打磨不到位，局部厚薄不均，返工找平至 0.12mm',
+        layerThickness: 0.12,
+      },
+    ];
+  }
+  return layers;
 }
 
 /** 重新计算每张琴的累计厚度（写入本地库前的派生值） */

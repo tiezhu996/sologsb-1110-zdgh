@@ -74,7 +74,13 @@ export async function importBackup(text: string): Promise<{ boards: number; cham
     await Promise.all([db.boards.clear(), db.chambers.clear(), db.lacquers.clear(), db.stringings.clear()]);
     if (payload.boards?.length) await db.boards.bulkPut(payload.boards as never[]);
     if (payload.chambers?.length) await db.chambers.bulkPut(payload.chambers as never[]);
-    if (payload.lacquers?.length) await db.lacquers.bulkPut(payload.lacquers as never[]);
+    if (payload.lacquers?.length) {
+      // 兼容旧版备份：补齐返工记录数组
+      const lacquers = (payload.lacquers as Array<{ reworks?: unknown }>).map((row) =>
+    Array.isArray(row.reworks) ? row : { ...row, reworks: [] },
+      );
+      await db.lacquers.bulkPut(lacquers as never[]);
+    }
     if (payload.stringings?.length) await db.stringings.bulkPut(payload.stringings as never[]);
   });
   return counts;

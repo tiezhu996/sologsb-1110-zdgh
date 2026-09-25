@@ -49,6 +49,11 @@ const remainLayers = computed(() => layersToTarget(props.layers, props.targetMm 
       <el-table-column prop="mixRatio" label="灰胎配比" width="110" />
       <el-table-column prop="layerThickness" label="本遍厚度(mm)" width="120" />
       <el-table-column prop="totalThickness" label="累计厚度(mm)" width="120" />
+      <el-table-column label="返工" width="90">
+        <template #default="scope">
+          <el-tag :type="scope.row.reworks.length ? 'danger' : 'info'" size="small">{{ scope.row.reworks.length }} 次</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="curingTemp" label="荫房温度(℃)" width="110" />
       <el-table-column prop="curingHumidity" label="湿度(%)" width="90" />
       <el-table-column prop="polishGrit" label="打磨目数" width="100" />

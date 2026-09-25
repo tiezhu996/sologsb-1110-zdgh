@@ -3,7 +3,8 @@ import { db } from '../utils/db';
 import { uid } from '../utils/id';
 import { toPlain } from '../utils/plain';
 import { cumulativeThickness, nextSeq, sortLayers } from '../utils/layer';
-import type { LacquerLayer } from '../types/lacquer-layer';
+import type { LacquerLayer, LayerRework } from '../types/lacquer-layer';
+import { useStringingStore } from './stringingStore';
 
 export interface LacquerInput {
   guqinNo: string;
@@ -15,6 +16,25 @@ export interface LacquerInput {
   appliedAt?: string;
   operator: string;
   remark?: string;
+}
+
+export interface ReworkInput {
+  /** 返工后的新厚度（mm） */
+  layerThickness: number;
+  /** 返工日期 ISO */
+  reworkedAt: string;
+  /** 返工人 */
+  reworker: string;
+  /** 返工原因（一句话） */
+  reason: string;
+}
+
+/** 该琴已上弦，须先撤掉上弦记录才能返工 */
+export class LayerStrungError extends Error {
+  constructor(public guqinNo: string) {
+    super(`琴 ${guqinNo} 已上弦，请先在上弦评价页撤掉上弦记录再返工`);
+    this.name = 'LayerStrungError';
+  }
 }
 
 interface LacquerState {
@@ -41,11 +61,17 @@ export const useLacquerStore = defineStore('lacquer', {
     outOfRangeCount(state): number {
       return state.layers.filter((l) => !(l.curingTemp >= 20 && l.curingTemp <= 30 && l.curingHumidity >= 70 && l.curingHumidity <= 85)).length;
     },
+    /** 全坊返工总次数（同一遍每返工一次累计一次） */
+    reworkCount(state): number {
+      return state.layers.reduce((sum, l) => sum + (l.reworks?.length ?? 0), 0);
+    },
   },
 
   actions: {
     async hydrate() {
-      this.layers = await db.lacquers.toArray();
+      const rows = await db.lacquers.toArray();
+      // 兼容 v3 升级前的历史行：reworks 可能缺失
+      this.layers = rows.map((row) => ({ ...row, reworks: Array.isArray(row.reworks) ? row.reworks : [] }));
       this.hydrated = true;
     },
 
@@ -65,6 +91,7 @@ export const useLacquerStore = defineStore('lacquer', {
         appliedAt: input.appliedAt ?? new Date().toISOString(),
         operator: input.operator.trim(),
         remark: input.remark?.trim() || undefined,
+        reworks: [],
       };
       const next = [...siblings, layer];
       const withTotals = next.map((item) => ({
@@ -82,13 +109,54 @@ export const useLacquerStore = defineStore('lacquer', {
     async updateLayer(id: string, patch: Partial<LacquerInput>) {
       const current = this.layers.find((l) => l.id === id);
       if (!current) return;
-      const next: LacquerLayer = { ...current, ...patch };
+      // 厚度不允许在普通编辑里静默改动：改厚度必须走「返工」登记
+      const { layerThickness: _ignored, ...safePatch } = patch;
+      const next: LacquerLayer = { ...current, ...safePatch };
       const siblings = this.layers.filter((l) => l.guqinNo === next.guqinNo).map((l) => (l.id === id ? next : l));
       const withTotals = siblings.map((item) => ({ ...item, totalThickness: cumulativeThickness(siblings, item.seq) }));
       for (const item of withTotals) {
         await db.lacquers.put(toPlain(item));
       }
       this.layers = this.layers.map((l) => withTotals.find((w) => w.id === l.id) ?? l);
+    },
+
+    /**
+     * 登记某一遍返工：遍次号不变，追加一条返工记录（同一遍可累计多条）；
+     * 本遍按新厚度算，并重算该琴从这一遍往后的累计厚度。
+     * 已上弦的琴须先撤掉上弦记录，否则抛 LayerStrungError。
+     */
+    async reworkLayer(id: string, input: ReworkInput): Promise<LacquerLayer> {
+      const current = this.layers.find((l) => l.id === id);
+      if (!current) {
+        throw new Error('未找到要返工的遍次记录');
+      }
+      if (useStringingStore().byGuqin(current.guqinNo)) {
+        throw new LayerStrungError(current.guqinNo);
+      }
+      const thickness = Number(input.layerThickness) || 0;
+      if (thickness <= 0) {
+        throw new Error('返工后的新厚度需大于 0');
+      }
+      const record: LayerRework = {
+        id: uid('rework'),
+        reworkedAt: input.reworkedAt,
+        reworker: input.reworker.trim(),
+        reason: input.reason.trim(),
+        layerThickness: thickness,
+      };
+      // 返工记录按返工时间倒序（最新在前）
+      const reworked: LacquerLayer = {
+        ...current,
+        layerThickness: thickness,
+        reworks: [record, ...(current.reworks ?? [])],
+      };
+      const siblings = this.layers.filter((l) => l.guqinNo === current.guqinNo).map((l) => (l.id === id ? reworked : l));
+      const withTotals = siblings.map((item) => ({ ...item, totalThickness: cumulativeThickness(siblings, item.seq) }));
+      for (const item of withTotals) {
+        await db.lacquers.put(toPlain(item));
+      }
+      this.layers = this.layers.map((l) => withTotals.find((w) => w.id === l.id) ?? l);
+      return withTotals.find((item) => item.id === id)!;
     },
 
     async removeLayer(id: string) {

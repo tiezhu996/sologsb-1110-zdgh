@@ -71,6 +71,7 @@ npm run build    # 类型检查 + 生产构建
 ## 数据存储说明
 
 - 全部数据存于浏览器 IndexedDB（Dexie，库名 `gbguqin-db`），表：`boards`、`chambers`、`lacquers`、`stringings`、`meta`。
-- `db.version(1)` 建表声明索引；`db.version(2).upgrade(...)` 为髹漆表增加 `[guqinNo+seq]` 复合索引并回填历史厚度。升级前可用顶栏「导出备份」导出全量 JSON。
+- `db.version(1)` 建表声明索引；`db.version(2).upgrade(...)` 为髹漆表增加 `[guqinNo+seq]` 复合索引并回填历史厚度；`db.version(3).upgrade(...)` 为每遍髹漆增加返工记录字段（旧记录回填空列表）。升级前可用顶栏「导出备份」导出全量 JSON。
+- 某遍打磨不到位可直接在该遍「返工」：遍次号不变，只把本遍厚度改为返工后的值并累计一条返工记录（返工日期、返工人、一句原因、前后厚度），该遍及之后各遍累计厚度自动重算；同一遍返工几次就累计几次。已上弦的琴须先撤掉上弦记录再返工。
 - 首次打开且表为空时写入一批示例工序档案（`src/utils/seed.ts`）。
 - 容器无状态：不使用数据库服务、不挂载命名卷，`docker compose down` 后数据仍留在浏览器中。

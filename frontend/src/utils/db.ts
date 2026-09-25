@@ -8,7 +8,7 @@ import type { Stringing } from '../types/stringing';
 export const DB_NAME = 'gbguqin-db';
 
 /** 当前 schema 版本，与 db.version(n) 对应 */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 class GuqinDB extends Dexie {
   boards!: Table<WoodBoard, string>;
@@ -46,6 +46,27 @@ class GuqinDB extends Dexie {
           .modify((row: LacquerLayer) => {
             if (!row.layerThickness && row.totalThickness) {
               row.layerThickness = row.totalThickness;
+            }
+          });
+      });
+
+    // v3：髹漆遍次支持返工登记。返工只改该遍厚度并累计返工记录（遍次号不变），
+    // 旧记录回填空返工列表。升级前请在顶栏「导出备份」导出 JSON。
+    this.version(3)
+      .stores({
+        boards: 'id, boardNo, guqinNo, part, species, grain, receivedAt',
+        chambers: 'id, guqinNo, postPos, carvedAt',
+        lacquers: 'id, guqinNo, seq, [guqinNo+seq], appliedAt',
+        stringings: 'id, guqinNo, stringType, strungAt',
+        meta: 'key',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('lacquers')
+          .toCollection()
+          .modify((row: LacquerLayer) => {
+            if (!row.reworks) {
+              row.reworks = [];
             }
           });
       });

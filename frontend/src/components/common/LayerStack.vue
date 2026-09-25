@@ -38,10 +38,11 @@ const remainLayers = computed(() => layersToTarget(props.layers, props.targetMm 
         v-for="segment in segments"
         :key="segment.layer.id"
         class="stack-segment"
+        :class="{ 'is-rework': segment.layer.reworks.length > 0 }"
         :style="{ width: `${segment.percent}%` }"
-        :title="`第 ${segment.layer.seq} 遍 · ${segment.layer.layerThickness}mm · ${segment.layer.mixRatio}`"
+        :title="`第 ${segment.layer.seq} 遍 · ${segment.layer.layerThickness}mm · ${segment.layer.mixRatio}${segment.layer.reworks.length ? ` · 返工 ${segment.layer.reworks.length} 次` : ''}`"
       >
-        <span class="stack-seq">{{ segment.layer.seq }}</span>
+        <span class="stack-seq">{{ segment.layer.seq }}<template v-if="segment.layer.reworks.length">↻{{ segment.layer.reworks.length }}</template></span>
       </div>
     </div>
     <el-table :data="layers" size="small" border>
@@ -54,6 +55,12 @@ const remainLayers = computed(() => layersToTarget(props.layers, props.targetMm 
       <el-table-column prop="polishGrit" label="打磨目数" width="100" />
       <el-table-column label="养护天数" width="100">
         <template #default="scope">{{ curingDays(scope.row) }} 天</template>
+      </el-table-column>
+      <el-table-column label="返工" width="80">
+        <template #default="scope">
+          <el-tag v-if="scope.row.reworks.length" type="warning" size="small">{{ scope.row.reworks.length }} 次</el-tag>
+          <span v-else>—</span>
+        </template>
       </el-table-column>
       <el-table-column prop="operator" label="髹漆人" width="90" />
     </el-table>
@@ -93,6 +100,10 @@ const remainLayers = computed(() => layersToTarget(props.layers, props.targetMm 
 }
 .stack-segment:nth-child(even) {
   background: #8a6a44;
+}
+.stack-segment.is-rework {
+  background: #d08a2e;
+  box-shadow: inset 0 0 0 1px #fff3d6;
 }
 .stack-seq {
   opacity: 0.9;

@@ -62,6 +62,7 @@ function buildSeedLayers(): LacquerLayer[] {
       totalThickness: 0,
       appliedAt: daysAgo(days),
       operator,
+      reworks: [],
     };
   });
 }

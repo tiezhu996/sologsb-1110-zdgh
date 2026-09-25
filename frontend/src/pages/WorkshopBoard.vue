@@ -61,6 +61,14 @@ const events = computed<TimelineEvent[]>(() => {
       text: `配比 ${layer.mixRatio}，本遍 ${layer.layerThickness}mm，累计 ${layer.totalThickness}mm，荫房 ${layer.curingTemp}℃ / ${layer.curingHumidity}%，${layer.polishGrit} 目`,
       type: 'warning',
     });
+    layer.reworks.forEach((rework) => {
+      list.push({
+        label: `第 ${layer.seq} 遍返工（第 ${rework.round} 次） · ${layer.guqinNo}`,
+        at: formatDate(rework.reworkedAt),
+        text: `本遍厚度 ${rework.thicknessBefore}→${rework.thicknessAfter}mm，该遍起累计厚度已重算；原因：${rework.reason}；返工人 ${rework.operator}`,
+        type: 'danger',
+      });
+    });
   });
   stringingStore.stringings.forEach((stringing) => {
     list.push({
@@ -101,7 +109,7 @@ const events = computed<TimelineEvent[]>(() => {
       <template #header>
         <div class="card-head">
           <span>阶段统计（已完成琴坯数）</span>
-          <span class="card-note">板材 {{ boardStore.boards.length }} 块（可用 {{ boardStore.usableCount }} 块）· 髹漆 {{ lacquerStore.layers.length }} 遍 · 荫房异常 {{ lacquerStore.outOfRangeCount }} 遍</span>
+          <span class="card-note">板材 {{ boardStore.boards.length }} 块（可用 {{ boardStore.usableCount }} 块）· 髹漆 {{ lacquerStore.layers.length }} 遍 · 返工 {{ lacquerStore.reworkCount }} 次 · 荫房异常 {{ lacquerStore.outOfRangeCount }} 遍</span>
         </div>
       </template>
       <el-row :gutter="12">

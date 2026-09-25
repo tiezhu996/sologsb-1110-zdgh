@@ -1,3 +1,20 @@
+/** 单遍返工记录：同一遍每返工一次累计一条，遍次号不变 */
+export interface ReworkRecord {
+  id: string;
+  /** 返工日期 ISO */
+  reworkedAt: string;
+  /** 返工人 */
+  operator: string;
+  /** 返工原因（一句话） */
+  reason: string;
+  /** 返工前该遍厚度（mm） */
+  thicknessBefore: number;
+  /** 返工后该遍厚度（mm），返工后本遍按此厚度计 */
+  thicknessAfter: number;
+  /** 这是该遍第几次返工（从 1 开始） */
+  round: number;
+}
+
 /** 灰胎髹漆遍次 */
 export interface LacquerLayer {
   id: string;
@@ -23,6 +40,8 @@ export interface LacquerLayer {
   operator: string;
   /** 备注 */
   remark?: string;
+  /** 返工记录（同一遍返工几次就累计几条，遍次号不变） */
+  reworks: ReworkRecord[];
 }
 
 /** 灰胎阶段常用配比 */
